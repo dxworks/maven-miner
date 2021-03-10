@@ -15,13 +15,13 @@ jobs:
       - name: Build
         run: mvn clean install
       - name: Prepare Assets
-          run: |
+        run: |
             mkdir maven-miner
             mkdir maven-miner/results
             cp README.md maven-miner/README.md
             cp target/maven-miner.jar maven-miner/maven-miner.jar
       - name: Create Archive
-          run: zip -r maven-miner.zip maven-miner
+        run: zip -r maven-miner.zip maven-miner
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
