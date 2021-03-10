@@ -24,6 +24,9 @@ fun main(args: Array<String>) {
 
     val baseFolder = File(baseFolderArg)
 
+    println("Starting Maven Miner\n")
+    println("Reading Files...")
+
     val baseFolderPath = baseFolder.toPath()
     val poms = Files.walk(baseFolderPath)
             .filter { it.isRegularFile() }
@@ -42,6 +45,7 @@ fun main(args: Array<String>) {
             .map { it.id to it }
             .toMap()
 
+    println("Creating Graph...")
     val nodes = modulesMap.keys.map { GraphNode(it.artifactID) }
     val links = modulesMap.values.map { module ->
         module.dependencies
@@ -49,17 +53,25 @@ fun main(args: Array<String>) {
                 .map { GraphLink(module.id.artifactID, it.id.artifactID) }
     }.flatten().toList()
 
-    Path.of("results").toFile().mkdirs()
+    val resultsPath = Path.of("results")
+    resultsPath.toFile().mkdirs()
 
     val modelPath = Path.of("results", "maven-model.json")
     val graphPath = Path.of("results", "maven-graph.json")
     val relationsPath = Path.of("results", "maven-relations.csv")
 
+    println("Writing Results...")
+
+
+    println("Exporting Model to $modelPath")
     jacksonObjectMapper().writerWithDefaultPrettyPrinter().writeValue(modelPath.toFile(), modulesMap.values)
+    println("Exporting Graph to $graphPath")
     jacksonObjectMapper().writerWithDefaultPrettyPrinter().writeValue(graphPath.toFile(), Graph(nodes, links))
 
+    println("Exporting Relations to $relationsPath")
     relationsPath.writeLines(links.map { "${it.source},${it.target},${it.value}" })
 
+    println("\nMaven Miner finished successfully! Please view your results at $resultsPath")
 }
 
 fun extractMavenModuleId(mavenModel: Model): MavenModuleId {
@@ -75,7 +87,6 @@ data class MavenModule(
         val parent: MavenParent? = null,
         var dependencies: List<MavenDependency> = ArrayList(),
         val properties: Properties
-//        val mavenModel: Model,
 ) {
     @JsonProperty("path")
     val relativePath = path.toString()
@@ -133,14 +144,5 @@ data class GraphLink(
         val source: String,
         val target: String,
         val value: Number = 1
-)
-
-data class Result(
-        val name: String,
-        val description: String,
-        val visualTags: List<String>,
-        val entity: String,
-        val timestamp: Long,
-        val content: Graph
 )
 
