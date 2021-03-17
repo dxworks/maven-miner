@@ -17,7 +17,7 @@ import kotlin.streams.toList
 @OptIn(ExperimentalPathApi::class)
 fun main(args: Array<String>) {
     if (args.size != 1) {
-        error("Bad arguments! Please provide only one argument, namely the path to the folder containing the source code.")
+        throw IllegalArgumentException("Bad arguments! Please provide only one argument, namely the path to the folder containing the source code.")
     }
 
     val baseFolderArg = args[0]
@@ -59,6 +59,7 @@ fun main(args: Array<String>) {
     val modelPath = Path.of("results", "maven-model.json")
     val graphPath = Path.of("results", "maven-graph.json")
     val relationsPath = Path.of("results", "maven-relations.csv")
+    val inspectorLibPath = Path.of("results", "il-deps.json")
 
     println("Writing Results...")
 
@@ -71,7 +72,14 @@ fun main(args: Array<String>) {
     println("Exporting Relations to $relationsPath")
     relationsPath.writeLines(links.map { "${it.source},${it.target},${it.value}" })
 
-    println("\nMaven Miner finished successfully! Please view your results at $resultsPath")
+    println("Exporting Inspector Lib results to $relationsPath")
+
+    println("\nMaven Miner finished successfully! Please view your results at $inspectorLibPath")
+    jacksonObjectMapper().writerWithDefaultPrettyPrinter().writeValue(inspectorLibPath.toFile(), modulesMap.values
+            .map { it.dependencies }
+            .flatten()
+            .map { it.toInspectorLibDep() }
+            .distinct())
 }
 
 fun extractMavenModuleId(mavenModel: Model): MavenModuleId {
@@ -128,6 +136,7 @@ data class MavenDependency(
         val optional: Boolean,
 ) {
     fun toModuleId() = MavenModuleId(groupID, artifactID, version)
+    fun toInspectorLibDep() = InspectorLibDependency("$groupID:$artifactID", version)
 }
 
 data class Graph(
@@ -144,5 +153,11 @@ data class GraphLink(
         val source: String,
         val target: String,
         val value: Number = 1
+)
+
+data class InspectorLibDependency(
+        val name: String,
+        val version: String?,
+        val provider: String = "maven"
 )
 
