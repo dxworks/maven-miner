@@ -24,7 +24,7 @@ fun main(args: Array<String>) {
 
     val baseFolder = File(baseFolderArg)
 
-    println("Starting Maven Miner\n")
+    println("Starting MaMi (MavenMiner)\n")
     println("Reading Files...")
 
     val baseFolderPath = baseFolder.toPath()
@@ -73,13 +73,13 @@ fun main(args: Array<String>) {
     relationsPath.writeLines(links.map { "${it.source},${it.target},${it.value}" })
 
     println("Exporting Inspector Lib results to $relationsPath")
-
-    println("\nMaven Miner finished successfully! Please view your results at $inspectorLibPath")
     jacksonObjectMapper().writerWithDefaultPrettyPrinter().writeValue(inspectorLibPath.toFile(), modulesMap.values
             .map { it.dependencies }
             .flatten()
             .map { it.toInspectorLibDep() }
             .distinct())
+
+    println("\nMaven Miner finished successfully! Please view your results in the ./results directory")
 }
 
 fun extractMavenModuleId(mavenModel: Model): MavenModuleId {
