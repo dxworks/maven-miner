@@ -12,8 +12,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
-      - name: Set Version
-        run: echo {{ github.ref }} > src/main/resources/maven-miner-version
       - name: Build
         run: mvn clean package
       - name: Prepare Assets
