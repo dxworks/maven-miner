@@ -10,7 +10,6 @@ import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.*
-import kotlin.collections.ArrayList
 import kotlin.io.path.*
 import kotlin.streams.toList
 
@@ -29,28 +28,41 @@ fun main(args: Array<String>) {
 
     val baseFolderPath = baseFolder.toPath()
     val poms = Files.walk(baseFolderPath)
-            .filter { it.isRegularFile() }
-            .filter { it.name == "pom.xml" }
-            .toList()
+        .filter { it.isRegularFile() }
+        .filter { it.name == "pom.xml" }
+        .toList()
 
     val mavenReader = MavenXpp3Reader()
 
     val modulesMap = poms
-            .mapNotNull { path ->
-                val mavenModel = mavenReader.read(path.inputStream())
-                val mavenModuleId = extractMavenModuleId(mavenModel)
-                val deps = mavenModel.dependencies.mapNotNull { MavenDependency(it.groupId, it.artifactId, it.version, it.isOptional) }
-                MavenModule(mavenModuleId, baseFolderPath.relativize(path), mavenModel.parent?.let { MavenParent(it) }, deps, mavenModel.properties)
+        .mapNotNull { path ->
+            val mavenModel = mavenReader.read(path.inputStream())
+            val mavenModuleId = extractMavenModuleId(mavenModel)
+            val deps = mavenModel.dependencies.mapNotNull {
+                MavenDependency(
+                    it.groupId,
+                    it.artifactId,
+                    it.version,
+                    it.isOptional
+                )
             }
-            .map { it.id to it }
-            .toMap()
+            MavenModule(
+                mavenModuleId,
+                baseFolderPath.relativize(path),
+                mavenModel.parent?.let { MavenParent(it) },
+                deps,
+                mavenModel.properties
+            )
+        }
+        .map { it.id to it }
+        .toMap()
 
     println("Creating Graph...")
     val nodes = modulesMap.keys.map { GraphNode(it.artifactID) }
     val links = modulesMap.values.map { module ->
         module.dependencies
-                .mapNotNull { modulesMap[it.toModuleId()] }
-                .map { GraphLink(module.id.artifactID, it.id.artifactID) }
+            .mapNotNull { modulesMap[it.toModuleId()] }
+            .map { GraphLink(module.id.artifactID, it.id.artifactID) }
     }.flatten().toList()
 
     val resultsPath = Path.of("results")
@@ -73,37 +85,40 @@ fun main(args: Array<String>) {
     relationsPath.writeLines(links.map { "${it.source},${it.target},${it.value}" })
 
     println("Exporting Inspector Lib results to $relationsPath")
-    jacksonObjectMapper().writerWithDefaultPrettyPrinter().writeValue(inspectorLibPath.toFile(), modulesMap.values
-            .map { it.dependencies }
-            .flatten()
-            .map { it.toInspectorLibDep() }
-            .distinct())
+    jacksonObjectMapper().writerWithDefaultPrettyPrinter()
+        .writeValue(inspectorLibPath.toFile(), modulesMap.entries.associate {
+            it.value.relativePath to it.value.dependencies
+                .map { it.toInspectorLibDep() }
+                .distinct()
+        })
 
     println("\nMaven Miner finished successfully! Please view your results in the ./results directory")
 }
 
 fun extractMavenModuleId(mavenModel: Model): MavenModuleId {
-    return MavenModuleId(mavenModel.groupId ?: mavenModel.parent?.groupId,
-            mavenModel.artifactId,
-            mavenModel.version ?: mavenModel.parent?.version)
+    return MavenModuleId(
+        mavenModel.groupId ?: mavenModel.parent?.groupId,
+        mavenModel.artifactId,
+        mavenModel.version ?: mavenModel.parent?.version
+    )
 }
 
 data class MavenModule(
-        val id: MavenModuleId,
-        @JsonIgnore
-        val path: Path,
-        val parent: MavenParent? = null,
-        var dependencies: List<MavenDependency> = ArrayList(),
-        val properties: Properties
+    val id: MavenModuleId,
+    @JsonIgnore
+    val path: Path,
+    val parent: MavenParent? = null,
+    var dependencies: List<MavenDependency> = ArrayList(),
+    val properties: Properties
 ) {
     @JsonProperty("path")
     val relativePath = path.toString()
 }
 
 open class MavenModuleId(
-        val groupID: String?,
-        val artifactID: String,
-        val version: String?,
+    val groupID: String?,
+    val artifactID: String,
+    val version: String?,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -124,40 +139,40 @@ open class MavenModuleId(
     }
 }
 
-class MavenParent(groupID: String?, artifactID: String, version: String?, val relativePath: String? = null)
-    : MavenModuleId(groupID, artifactID, version) {
+class MavenParent(groupID: String?, artifactID: String, version: String?, val relativePath: String? = null) :
+    MavenModuleId(groupID, artifactID, version) {
     constructor(parent: Parent) : this(parent.groupId, parent.artifactId, parent.version, parent.relativePath)
 }
 
 data class MavenDependency(
-        val groupID: String?,
-        val artifactID: String,
-        val version: String?,
-        val optional: Boolean,
+    val groupID: String?,
+    val artifactID: String,
+    val version: String?,
+    val optional: Boolean,
 ) {
     fun toModuleId() = MavenModuleId(groupID, artifactID, version)
     fun toInspectorLibDep() = InspectorLibDependency("$groupID:$artifactID", version)
 }
 
 data class Graph(
-        val nodes: List<GraphNode>,
-        val links: List<GraphLink>
+    val nodes: List<GraphNode>,
+    val links: List<GraphLink>
 )
 
 data class GraphNode(
-        val name: String,
-        val component: Number = 1
+    val name: String,
+    val component: Number = 1
 )
 
 data class GraphLink(
-        val source: String,
-        val target: String,
-        val value: Number = 1
+    val source: String,
+    val target: String,
+    val value: Number = 1
 )
 
 data class InspectorLibDependency(
-        val name: String,
-        val version: String?,
-        val provider: String = "maven"
+    val name: String,
+    val version: String?,
+    val provider: String = "maven"
 )
 
