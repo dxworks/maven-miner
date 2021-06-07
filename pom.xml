@@ -6,10 +6,12 @@
 
     <groupId>prg.dxworks.plugins</groupId>
     <artifactId>maven-miner</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.2.0-SNAPSHOT</version>
 
     <properties>
         <kotlin.version>1.4.30</kotlin.version>
+        <final.jar.name>mami</final.jar.name>
+        <main.class>org.dxworks.mavenminer.MaMiKt</main.class>
     </properties>
 
     <dependencies>
@@ -34,7 +36,16 @@
             <artifactId>jackson-module-kotlin</artifactId>
             <version>2.12.1</version>
         </dependency>
-
+        <dependency>
+            <groupId>org.dxworks</groupId>
+            <artifactId>dx-ignore</artifactId>
+            <version>1.1.0-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>org.whitesource</groupId>
+            <artifactId>maven-dependency-tree-parser</artifactId>
+            <version>1.0.6</version>
+        </dependency>
     </dependencies>
 
     <build>
@@ -75,10 +86,10 @@
                     <archive>
                         <manifest>
                             <addClasspath>true</addClasspath>
-                            <mainClass>org.dxworks.mavenminer.MainKt</mainClass>
+                            <mainClass>${main.class}</mainClass>
                         </manifest>
                     </archive>
-                    <finalName>maven-miner</finalName>
+                    <finalName>${final.jar.name}</finalName>
                     <appendAssemblyId>false</appendAssemblyId>
                 </configuration>
 
@@ -91,11 +102,16 @@
                         </goals>
                     </execution>
                 </executions>
-
             </plugin>
-
         </plugins>
     </build>
+
+    <repositories>
+        <repository>
+            <id>ossrh</id>
+            <url>https://s01.oss.sonatype.org/content/repositories/snapshots/</url>
+        </repository>
+    </repositories>
 
 
 </project>
