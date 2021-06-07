@@ -7,19 +7,41 @@ import org.apache.maven.model.Exclusion
 import org.apache.maven.model.Model
 import org.apache.maven.model.Parent
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader
+import org.dxworks.mavenminer.deptree.transform
+import org.dxworks.mavenminer.dto.InspectorLibDependency
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.*
 import kotlin.io.path.*
 import kotlin.streams.toList
+import kotlin.system.exitProcess
 
-@OptIn(ExperimentalPathApi::class)
+
+const val usage = """
+    Bad arguments! Please provide at least one argument
+        * If you want to mine a folder provide one argument, namely the path to the folder containing the source code.
+        * If you want to convert dependency-tree files to il-deps.json files, there are 2 options:
+                java -jar mami.jar convert <path_to_file>
+                java -jar mami.jar convert <path_to_folder> -> all files from that folder will be treated as dependency tree files and mami will try to transform them
+                java -jar mami.jar convert <path_to_folder> <file_pattern_glob> -> all files matching the glob from that folder will be treated as dependency tree files and mami will try to transform them
+                    example: java -jar mami.jar convert /path/to/folder *.txt
+"""
+
 fun main(args: Array<String>) {
-    if (args.size != 1) {
-        throw IllegalArgumentException("Bad arguments! Please provide only one argument, namely the path to the folder containing the source code.")
+    if (args.size < 1) {
+        println(usage)
+        exitProcess(1)
     }
 
+    if (args.size == 1)
+        mine(args)
+    else
+        transform(args)
+}
+
+@OptIn(ExperimentalPathApi::class)
+private fun mine(args: Array<String>) {
     val baseFolderArg = args[0]
 
     val baseFolder = File(baseFolderArg)
@@ -408,11 +430,5 @@ data class GraphLink(
     val source: String,
     val target: String,
     val value: Number = 1
-)
-
-data class InspectorLibDependency(
-    val name: String,
-    val version: String?,
-    val provider: String = "maven"
 )
 
