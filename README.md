@@ -16,3 +16,6 @@ This will generate in the `results` folder 4 files:
 * `maven-model.json` ---> a simplified model of your maven modules
 * `maven-relations.csv` ---> a csv with the relations between the modules.
 * `il-deps.json` ---> an input file for Inspector Lib.
+
+### Transforming dependency tree files to il-deps.json format
+TBA
