@@ -2,6 +2,7 @@ on:
   push:
     tags:
       - 'v*'
+      - '!v*-voyager'
 
 name: Upload Release Asset
 
@@ -19,7 +20,9 @@ jobs:
             mkdir maven-miner
             mkdir maven-miner/results
             cp README.md maven-miner/README.md
-            cp target/mami.jar maven-miner/maven-miner.jar
+            cp target/mami.jar maven-miner/mami.jar
+            cp bin/mami.sh maven-miner/mami.sh
+            cp bin/mami.bat maven-miner/mami.bat
       - name: Create Archive
         run: zip -r maven-miner.zip maven-miner
       - name: Create Release

@@ -18,4 +18,12 @@ This will generate in the `results` folder 4 files:
 * `il-deps.json` ---> an input file for Inspector Lib.
 
 ### Transforming dependency tree files to il-deps.json format
-TBA
+If you want to convert dependency-tree files to il-deps.json files, there are 2 options:
+* `java -jar mami.jar convert <path_to_deptree_file> <path_to_maven_model>`
+* `java -jar mami.jar convert <path_to_deptree_folder> <path_to_maven_model>` -> all files from that folder will be treated as dependency tree files and mami will try to transform them
+* `java -jar mami.jar convert <path_to_deptree_folder> <file_pattern_glob> <path_to_maven_model>` -> all files matching the glob from that folder will be treated as dependency tree files and mami will try to transform them
+example: `java -jar mami.jar convert /path/to/folder *.txt /path/to/maven/model/json/file`
+  
+To generate a maven dependency tree file please run the following command:
+`mvn dependency:tree -DoutputFile="path/to/deptree/file.txt" -DappendOutput`
+The appendOutput parameter is necessary if you have a multi-module project. For more information please see the [official maven dependency plugin documentation](https://maven.apache.org/plugins/maven-dependency-plugin/tree-mojo.html).

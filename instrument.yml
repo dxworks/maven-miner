@@ -6,5 +6,5 @@ results:
 
 commands:
   - name: Mine Maven
-    win: java -jar maven-miner.jar ${repo}
-    unix: java -jar maven-miner.jar ${repo}
+    win: java -jar mami.jar ${repo}
+    unix: java -jar mami.jar ${repo}

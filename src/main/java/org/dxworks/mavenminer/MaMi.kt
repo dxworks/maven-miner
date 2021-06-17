@@ -1,6 +1,7 @@
 package org.dxworks.mavenminer
 
 import com.fasterxml.jackson.annotation.JsonIgnore
+import com.fasterxml.jackson.annotation.JsonKey
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.apache.maven.model.Exclusion
@@ -22,10 +23,10 @@ const val usage = """
     Bad arguments! Please provide at least one argument
         * If you want to mine a folder provide one argument, namely the path to the folder containing the source code.
         * If you want to convert dependency-tree files to il-deps.json files, there are 2 options:
-                java -jar mami.jar convert <path_to_file>
-                java -jar mami.jar convert <path_to_folder> -> all files from that folder will be treated as dependency tree files and mami will try to transform them
-                java -jar mami.jar convert <path_to_folder> <file_pattern_glob> -> all files matching the glob from that folder will be treated as dependency tree files and mami will try to transform them
-                    example: java -jar mami.jar convert /path/to/folder *.txt
+                java -jar mami.jar convert <path_to_deptree_file> <path_to_maven_model>
+                java -jar mami.jar convert <path_to_deptree_folder> <path_to_maven_model> -> all files from that folder will be treated as dependency tree files and mami will try to transform them
+                java -jar mami.jar convert <path_to_deptree_folder> <file_pattern_glob> <path_to_maven_model> -> all files matching the glob from that folder will be treated as dependency tree files and mami will try to transform them
+                    example: java -jar mami.jar convert /path/to/folder *.txt /path/to/maven/model/json/file
 """
 
 fun main(args: Array<String>) {
@@ -82,7 +83,7 @@ private fun mine(args: Array<String>) {
             }.orEmpty()
             MavenModule(
                 mavenModuleId,
-                baseFolderPath.relativize(path),
+                baseFolderPath.relativize(path).toString(),
                 mavenModel.parent?.let { MavenParent(it) },
                 deps,
                 mavenModel.properties,
@@ -104,7 +105,6 @@ private fun mine(args: Array<String>) {
     resultsPath.toFile().mkdirs()
 
     val modelPath = Path.of("results", "maven-model.json")
-    val newmodelPath = Path.of("results", "new-maven-model.json")
     val graphPath = Path.of("results", "maven-graph.json")
     val relationsPath = Path.of("results", "maven-relations.csv")
     val inspectorLibPath = Path.of("results", "il-maven-deps.json")
@@ -120,230 +120,29 @@ private fun mine(args: Array<String>) {
     println("Exporting Relations to $relationsPath")
     relationsPath.writeLines(links.map { "${it.source},${it.target},${it.value}" })
 
-    val newDeps = searchVersions(modulesMap)
-
-    println("Exporting Model to $newmodelPath")
-    jacksonObjectMapper().writerWithDefaultPrettyPrinter().writeValue(newmodelPath.toFile(), newDeps.values)
-
-/*    println("Exporting Inspector Lib results to $inspectorLibPath")
-    jacksonObjectMapper().writerWithDefaultPrettyPrinter()
-        .writeValue(inspectorLibPath.toFile(), modulesMap.entries.associate {
-            it.value.relativePath to it.value.dependencies
-               .map { it.toInspectorLibDep() }
-                .distinct()
-        })*/
-
     println("Exporting Inspector Lib results to $inspectorLibPath")
     jacksonObjectMapper().writerWithDefaultPrettyPrinter()
-        .writeValue(inspectorLibPath.toFile(), newDeps.entries.associate {
-            it.value.relativePath.substringBeforeLast("\\") to it.value.dependencies
+        .writeValue(inspectorLibPath.toFile(), modulesMap.entries.associate {
+            it.value.path to it.value.dependencies
                 .map { it.toInspectorLibDep() }
                 .distinct()
         })
 
+//    val newmodelPath = Path.of("results", "new-maven-model.json")
+//    val newDeps = searchVersions(modulesMap)
+//
+//    println("Exporting Model to $newmodelPath")
+//    jacksonObjectMapper().writerWithDefaultPrettyPrinter().writeValue(newmodelPath.toFile(), newDeps.values)
+
+//    println("Exporting Inspector Lib results to $inspectorLibPath")
+//    jacksonObjectMapper().writerWithDefaultPrettyPrinter()
+//        .writeValue(inspectorLibPath.toFile(), newDeps.entries.associate {
+//            it.value.relativePath.substringBeforeLast("\\") to it.value.dependencies
+//                .map { it.toInspectorLibDep() }
+//                .distinct()
+//        })
+
     println("\nMaven Miner finished successfully! Please view your results in the ./results directory")
-}
-
-fun searchVersions(values: Map<MavenModuleId, MavenModule>): Map<MavenModuleId, MavenModule> {
-    val v = values
-
-    v.map { it.value }.forEach { entry ->
-        if (entry.id.version?.contains("\${") == true) {
-            if (entry.properties.isNotEmpty()) {
-                entry.properties.forEach {
-                    if (entry.id.version == "\${${it.key}}") {
-                        entry.id.version = it.value as String?
-                    } else {
-                        searchIdVersion(entry, v)
-                    }
-                }
-            } else {
-                searchIdVersion(entry, v)
-            }
-        }
-    }
-
-    v.map { it.value }.forEach { entry ->
-        if (entry.parent?.version?.contains("\${") == true) {
-            searchParentVersion(entry, v)
-        }
-    }
-
-    v.map { it.value }.forEach { entry ->
-        entry.dependencies.forEach { dep ->
-            if (dep.version == "\${project.version}") {
-                dep.version = entry.id.version
-            }
-            if (dep.version == "\${project.parent.version}") {
-                dep.version = entry.parent?.version
-            }
-        }
-        entry.dependencyManagementDependencies.forEach { dep ->
-            if (dep.version == "\${project.version}") {
-                dep.version = entry.id.version.toString()
-            }
-            if (dep.version == "\${project.parent.version}") {
-                dep.version = entry.parent?.version.toString()
-            }
-        }
-    }
-
-    v.map { it.value }.forEach { entry ->
-        entry.dependencies.forEach { dep ->
-            if (dep.version?.contains("\${") == true) {
-                if (entry.properties.isNotEmpty()) {
-                    entry.properties.forEach {
-                        if (dep.version == "\${${it.key}}") {
-                            dep.version = it.value as String?
-                        } else {
-                            searchDependencyVersion(entry, v)
-                        }
-                    }
-                } else {
-                    searchDependencyVersion(entry, v)
-                }
-            }
-        }
-        entry.dependencyManagementDependencies.forEach { dep ->
-            if (dep.version.contains("\${") == true) {
-                if (entry.properties.isNotEmpty()) {
-                    entry.properties.forEach {
-                        if (dep.version == "\${${it.key}}") {
-                            dep.version = it.value as String
-                        } else {
-                            searchDependencyManagementVersion(entry, v)
-                        }
-                    }
-                } else {
-                    searchDependencyManagementVersion(entry, v)
-                }
-            }
-        }
-    }
-
-    v.map { it.value }.forEach { entry ->
-        entry.dependencies.forEach { dep ->
-            if (dep.version.isNullOrEmpty()) {
-                if (entry.dependencyManagementDependencies.isNotEmpty()) {
-                    entry.dependencyManagementDependencies.forEach {
-                        if ((it.groupID == dep.groupID) && (it.artifactID == dep.artifactID)) {
-                            dep.version = it.version
-                        } else {
-                            searchDependencyManagement(entry, v)
-                        }
-                    }
-                } else {
-                    searchDependencyManagement(entry, v)
-                }
-            }
-        }
-    }
-
-    return v
-}
-
-fun searchDependencyManagement(entry: MavenModule, v: Map<MavenModuleId, MavenModule>) {
-    var currentPath = entry.path.toString().substringBeforeLast("\\")
-    var parentPath = currentPath.substringBeforeLast("\\")
-
-    while (parentPath != currentPath) {
-        v.map { it.value }.forEach { e ->
-            if (e.path.toString() == "$parentPath\\pom.xml") {
-                if (e.dependencyManagementDependencies.isNotEmpty()) {
-                    e.dependencyManagementDependencies.forEach { dep ->
-                        entry.dependencies.forEach {
-                            if ((it.groupID == dep.groupID) && (it.artifactID == dep.artifactID)) {
-                                it.version = dep.version
-                            }
-                        }
-
-                    }
-                }
-            }
-            currentPath = parentPath
-            parentPath = parentPath.substringBeforeLast("\\")
-        }
-    }
-}
-
-fun searchParentVersion(entry: MavenModule, v: Map<MavenModuleId, MavenModule>) {
-    v.map { it.value }.forEach { e ->
-        if (e.id.groupID == entry.parent?.groupID && e.id.artifactID == entry.parent?.artifactID) {
-            entry.parent.version = e.id.version
-        }
-    }
-}
-
-fun searchIdVersion(entry: MavenModule, v: Map<MavenModuleId, MavenModule>) {
-    var currentPath = entry.path.toString().substringBeforeLast("\\")
-    var parentPath = currentPath.substringBeforeLast("\\")
-
-    while (parentPath != currentPath) {
-        v.map { it.value }.forEach { e ->
-            if (e.path.toString() == "$parentPath\\pom.xml") {
-                if (e.properties.isNotEmpty()) {
-                    e.properties.forEach {
-                        if (entry.id.version == "\${${it.key}}") {
-                            entry.id.version = it.value as String?
-                            return
-                        }
-                    }
-                }
-            }
-            currentPath = parentPath
-            parentPath = parentPath.substringBeforeLast("\\")
-        }
-    }
-}
-
-fun searchDependencyVersion(entry: MavenModule, v: Map<MavenModuleId, MavenModule>) {
-    var currentPath = entry.path.toString().substringBeforeLast("\\")
-    var parentPath = currentPath.substringBeforeLast("\\")
-
-    while (parentPath != currentPath) {
-        v.map { it.value }.forEach { e ->
-            if (e.path.toString() == "$parentPath\\pom.xml") {
-                if (e.properties.isNotEmpty()) {
-                    e.properties.forEach { prop ->
-                        entry.dependencies.forEach {
-                            if (it.version == "\${${prop.key}}") {
-                                it.version = prop.value as String?
-                                return
-                            }
-                        }
-
-                    }
-                }
-            }
-            currentPath = parentPath
-            parentPath = parentPath.substringBeforeLast("\\")
-        }
-    }
-}
-
-fun searchDependencyManagementVersion(entry: MavenModule, v: Map<MavenModuleId, MavenModule>) {
-    var currentPath = entry.path.toString().substringBeforeLast("\\")
-    var parentPath = currentPath.substringBeforeLast("\\")
-
-    while (parentPath != currentPath) {
-        v.map { it.value }.forEach { e ->
-            if (e.path.toString() == "$parentPath\\pom.xml") {
-                if (e.properties.isNotEmpty()) {
-                    e.properties.forEach { prop ->
-                        entry.dependencyManagementDependencies.forEach {
-                            if (it.version == "\${${prop.key}}") {
-                                it.version = prop.value as String
-                                return
-                            }
-                        }
-
-                    }
-                }
-            }
-            currentPath = parentPath
-            parentPath = parentPath.substringBeforeLast("\\")
-        }
-    }
 }
 
 fun extractMavenModuleId(mavenModel: Model): MavenModuleId {
@@ -356,16 +155,12 @@ fun extractMavenModuleId(mavenModel: Model): MavenModuleId {
 
 data class MavenModule(
     val id: MavenModuleId,
-    @JsonIgnore
-    val path: Path,
+    val path: String,
     val parent: MavenParent? = null,
     var dependencies: List<MavenDependency> = ArrayList(),
     val properties: Properties,
     val dependencyManagementDependencies: List<MavenDependencyManagementDependency>
-) {
-    @JsonProperty("path")
-    val relativePath = path.toString()
-}
+)
 
 open class MavenModuleId(
     val groupID: String?,
