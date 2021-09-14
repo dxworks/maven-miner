@@ -12,6 +12,21 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+
+      - name: Extract Semver
+        id: semver_parser
+        run: |
+          semver=${TAG#"refs/tags/v"}
+          semver=${semver%"-voyager"}
+          echo ::set-output name=semver::$semver
+        env:
+          TAG: ${{ github.ref }}
+
+      - name: Fill Version
+        run: |
+          tag=${{ steps.semver_parser.outputs.semver }}
+          sed -i "s/\$tag_version/$tag/" pom.xml
+
       - name: Build
         run: mvn clean package
       - name: Prepare Assets
@@ -22,25 +37,21 @@ jobs:
           cp bin/mami.sh maven-miner/mami.sh
           cp bin/mami.bat maven-miner/mami.bat
           cp instrument.yml maven-miner/instrument.yml
+
       - name: Create Archive
-        run: zip -r maven-miner.zip maven-miner
+        run: zip -r maven-miner-voyager.zip maven-miner
+
+      - name: Prepare Release Notes
+        run: touch ${{ github.workspace }}/releaseNotes/v${{ steps.semver_parser.outputs.semver }}.md
+
       - name: Create Release
         id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ github.ref }}
-          release_name: maven-miner ${{ github.ref }} (Voyager)
-          draft: false
+          name: Maven Miner ${{ steps.semver_parser.outputs.semver }}
+          body_path: ${{ github.workspace }}/releaseNotes/v${{ steps.semver_parser.outputs.semver }}.md
+          body: ""
           prerelease: false
-      - name: Upload Release Asset
-        id: upload-release-asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./maven-miner.zip
-          asset_name: maven-miner-voyager.zip
-          asset_content_type: application/zip
+          draft: false
+          fail_on_unmatched_files: true
+          files: maven-miner-voyager.zip

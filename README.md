@@ -3,6 +3,13 @@
 MavenMiner, sometimes also called MaMi, is a tool which extracts the basic model of your maven projects. It also creates a graph of relations between the internal modules of your project.
 Please visit us on [Github](https://github.com/dxworks/maven-miner).
 
+## Use as Voyager Instrument
+To use Maven Miner with voyenv add the following to your `instruments` in `voyenv.yml`:
+```yaml
+  - name: dxworks/maven-miner
+    asset: maven-miner-voyager.zip
+```
+
 ## Prerequisites
 You need to have java version 11 or greater installed on your machine, before trying to run the tool.
 

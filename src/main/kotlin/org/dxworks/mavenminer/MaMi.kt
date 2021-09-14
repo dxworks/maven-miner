@@ -1,8 +1,5 @@
 package org.dxworks.mavenminer
 
-import com.fasterxml.jackson.annotation.JsonIgnore
-import com.fasterxml.jackson.annotation.JsonKey
-import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.apache.maven.model.Exclusion
 import org.apache.maven.model.Model
@@ -29,6 +26,12 @@ const val usage = """
                     example: java -jar mami.jar convert /path/to/folder *.txt /path/to/maven/model/json/file
 """
 
+val version by lazy {
+    Properties().apply { load(object {}::class.java.classLoader.getResourceAsStream("maven.properties")) }["version"]
+}
+
+val versionCommandArgs = setOf("-v", "version", "--version", "-version", "-V")
+
 fun main(args: Array<String>) {
     if (args.size < 1) {
         println(usage)
@@ -36,7 +39,10 @@ fun main(args: Array<String>) {
     }
 
     if (args.size == 1)
-        mine(args)
+        if (versionCommandArgs.contains(args[0]))
+            println("MaMi (Maven Miner) $version")
+        else
+            mine(args)
     else
         transform(args)
 }
