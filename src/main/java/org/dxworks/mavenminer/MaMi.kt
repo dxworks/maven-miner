@@ -23,9 +23,9 @@ const val usage = """
     Bad arguments! Please provide at least one argument
         * If you want to mine a folder provide one argument, namely the path to the folder containing the source code.
         * If you want to convert dependency-tree files to il-deps.json files, there are 2 options:
-                java -jar mami.jar convert <path_to_deptree_file> <path_to_maven_model>
-                java -jar mami.jar convert <path_to_deptree_folder> <path_to_maven_model> -> all files from that folder will be treated as dependency tree files and mami will try to transform them
-                java -jar mami.jar convert <path_to_deptree_folder> <file_pattern_glob> <path_to_maven_model> -> all files matching the glob from that folder will be treated as dependency tree files and mami will try to transform them
+                java -jar mami.jar convert <path_to_deptree_file> [-model=<path_to_maven_model>]
+                java -jar mami.jar convert <path_to_deptree_folder> [-model=<path_to_maven_model>] -> all files from that folder will be treated as dependency tree files and mami will try to transform them
+                java -jar mami.jar convert <path_to_deptree_folder> [-pattern=file_pattern_glob] [-model=<path_to_maven_model>] -> all files matching the glob from that folder will be treated as dependency tree files and mami will try to transform them
                     example: java -jar mami.jar convert /path/to/folder *.txt /path/to/maven/model/json/file
 """
 
@@ -183,6 +183,10 @@ open class MavenModuleId(
         var result = groupID?.hashCode() ?: 0
         result = 31 * result + artifactID.hashCode()
         return result
+    }
+
+    override fun toString(): String {
+        return "MavenModuleId(groupID=$groupID, artifactID='$artifactID', version=$version)"
     }
 }
 

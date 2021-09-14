@@ -8,6 +8,7 @@ import fr.dutra.tools.maven.deptree.core.Node
 import fr.dutra.tools.maven.deptree.core.Visitor
 import org.dxworks.ignorerLibrary.IgnorerBuilder
 import org.dxworks.mavenminer.MavenModule
+import org.dxworks.mavenminer.MavenModuleId
 import org.dxworks.mavenminer.dto.InspectorLibDependency
 import org.dxworks.mavenminer.usage
 import java.io.File
@@ -19,19 +20,18 @@ val jsonWriter: ObjectWriter = jacksonObjectMapper().writerWithDefaultPrettyPrin
 
 fun transform(args: Array<String>) {
     val convertArg = args[0];
-    if (convertArg != "convert" || args.size < 2 || args.size > 3) {
+    if (convertArg != "convert" || args.size < 2 || args.size > 4) {
         println(usage)
         exitProcess(1)
     }
 
     val fileOrFolderArg = args[1]
-    val modelFilePath = if (args.size == 2) args[1] else args[2]
-    val glob = if (args.size == 3) args[1] else "*"
+    val modelFilePath = args.find { it.startsWith("-model=") }?.removePrefix("-model=")
+    val glob = args.find { it.startsWith("-pattern=") }?.removePrefix("-pattern=") ?: "*"
     val globMatcher = IgnorerBuilder(listOf(glob)).compile()
 
     val file = File(fileOrFolderArg)
-    val modelFile = File(modelFilePath)
-    val modules: List<MavenModule> = jacksonObjectMapper().readValue(modelFile)
+    val modules: List<MavenModule> = extractModules(modelFilePath?.let { File(it) })
 
     when {
         file.isFile -> convertDepTreeFileToJson(file, modules)
@@ -40,6 +40,17 @@ fun transform(args: Array<String>) {
             .filter { globMatcher.accepts(it.name) }
             .forEach { convertDepTreeFileToJson(it, modules) }
         else -> throw FileNotFoundException(file.absolutePath)
+    }
+}
+
+fun extractModules(modelFile: File?): List<MavenModule> {
+    if (modelFile == null)
+        return emptyList()
+    return try {
+        jacksonObjectMapper().readValue(modelFile)
+    } catch (e: Exception) {
+        println("Warning: could not parse maven model file: ${modelFile.absolutePath}!")
+        return emptyList()
     }
 }
 
@@ -56,7 +67,7 @@ fun parseMavenDependencyTree(file: File, modules: List<MavenModule>): Map<String
 
     val treeContent = StringBuilder()
     file.readLines().forEach {
-        if(it.matches(Regex("^[a-zA-Z].*$")) && treeContent.isNotBlank()) {
+        if (it.matches(Regex("^[a-zA-Z].*$")) && treeContent.isNotBlank()) {
             val tree = InputType.TEXT.newParser().parse(treeContent.toString().reader())
             val visitor = MavenDependencyTreeVisitor()
             visitor.visit(tree)
@@ -74,29 +85,22 @@ fun parseMavenDependencyTree(file: File, modules: List<MavenModule>): Map<String
     return visitorsList.associate { getPathToProject(it.root, modules) to it.dependencies }
 }
 
-fun getPathToProject(mavenProject: String, modules: List<MavenModule>): String {
-    val segments = mavenProject.split(":")
-    if (segments.size < 2) {
-        println("Warning: could not find group and artifact id for $mavenProject")
-        return mavenProject
-    }
-    val groupId = segments[0]
-    val artifactId = segments[1]
+fun getPathToProject(mavenModuleId: MavenModuleId, modules: List<MavenModule>): String {
+    val mavenProjectPath = modules.find { it.id.groupID == mavenModuleId.groupID && it.id.artifactID == mavenModuleId.artifactID }
+        ?.let { it.path.removeSuffix("pom.xml").removeSuffix("/") }
+    if (mavenProjectPath == null)
+        println("Warning: could not find $mavenModuleId in the maven model!")
 
-    val mavenProjectPath = modules.find { it.id.groupID == groupId && it.id.artifactID == artifactId }?.let { it.path.removeSuffix("pom.xml").removeSuffix("/") }
-    if(mavenProjectPath == null)
-        println("Warning: could not find $mavenProject in the maven model!")
-
-    return mavenProjectPath ?: mavenProject
+    return mavenProjectPath ?: mavenModuleId.artifactID
 }
 
 class MavenDependencyTreeVisitor : Visitor {
-    lateinit var root: String
+    lateinit var root: MavenModuleId
     var dependencies: List<InspectorLibDependency> = ArrayList()
 
     override fun visit(node: Node) {
         if (!this::root.isInitialized)
-            root = node.artifactCanonicalForm
+            root = MavenModuleId(node.groupId, node.artifactId, node.version)
         else {
             dependencies = dependencies + node.toDTO()
         }
