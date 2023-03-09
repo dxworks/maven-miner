@@ -44,7 +44,7 @@ fun main(args: Array<String>) {
         else
             mine(args)
     else
-        transform(args)
+        transform(args[0])
 }
 
 @OptIn(ExperimentalPathApi::class)
@@ -165,8 +165,33 @@ data class MavenModule(
     val parent: MavenParent? = null,
     var dependencies: List<MavenDependency> = ArrayList(),
     val properties: Properties,
-    val dependencyManagementDependencies: List<MavenDependencyManagementDependency>
-)
+    val dependencyManagementDependencies: List<MavenDependencyManagementDependency> = emptyList()
+) {
+    fun resolveDependencyVersions() {
+        dependencies.forEach { dependency ->
+            if (dependency.version.orEmpty().startsWith("\${")) {
+                val variable = dependency.version!!.removePrefix("\${").removeSuffix("}")
+                if (properties.containsKey(variable)) {
+                    dependency.version = properties.getProperty(variable)
+                }
+            }
+            else if (dependency.version == null) {
+                dependencyManagementDependencies.find {
+                    it.groupID == dependency.groupID && it.artifactID == dependency.artifactID
+                }?.let {
+                    if (it.version.startsWith("\${")) {
+                        val variable = it.version.removePrefix("\${").removeSuffix("}")
+                        if (properties.containsKey(variable)) {
+                            dependency.version = properties.getProperty(variable)
+                        }
+                    } else {
+                        dependency.version = it.version
+                    }
+                }
+            }
+        }
+    }
+}
 
 open class MavenModuleId(
     val groupID: String?,
